@@ -1,0 +1,126 @@
+---
+title: "ECOBICI: EDA"
+author: "Agustín Diez"
+date: "---"
+output: 
+  html_notebook:
+    theme: lumen
+    toc: yes
+    toc_float: yes
+    df_print: paged
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+
+```{r, echo=FALSE}
+options(scipen=999)
+
+```
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(lubridate)
+library(anytime)
+```
+
+
+# Objetivo
+
+El objetivo de este archivo es crear una tabla resumen de los usuarios que se inscribieron por año
+
+Se cuenta con información de 2015 a 2023
+
+## Seteo de directorio
+
+```{r}
+setwd("D:\\OneDrive\\Personal\\Maestria Data Mining\\Cuatrimestre_3\\Taller de Tesis I\\Ecobici")
+```
+
+
+## Análisis de información
+
+```{r}
+# Cargo todos los datasets de usuario y veo su nombre 
+
+# Directorio
+csv_directory <- "datasets/usuarios/"
+
+#Dataframe vacio
+usuarios <- data.frame()
+
+# Lista de .csv
+csv_files <- list.files(csv_directory, pattern = ".csv", full.names = TRUE)
+
+# Lista para guardar los nombres de columnas e información relevante
+column_names_list <- list()
+usuarios_year <- list()
+
+# Recorro cada csv
+for (file in csv_files) {
+  print(file)
+  #Extraigo el año
+  
+  anio <- regmatches(file, regexpr("\\d{4}", file))
+  print(anio)
+  
+  # Cargo el .csv como dataframe
+  df <- read.csv(file)
+  
+  df$fecha_alta <- parse_date_time(df$fecha_alta, orders = c("mdy", "dmy", "ymd"))
+  
+  
+  #Agrego el año como columna
+  df <-  df %>% mutate(year_alta=anio,
+                       mes_alta =format(fecha_alta, format = "%m") )
+  
+  # Extraigo las columnas de cada uno
+  column_names <- colnames(df)
+  numero_usuarios <- nrow(df)
+  
+  
+  # Add the column names to the list
+  column_names_list[[file]] <- column_names
+  usuarios_year <- c(usuarios_year,numero_usuarios)
+  
+    
+  # Convierto todo a lowercase para poder unir
+  new_names <- tolower(column_names)
+  
+  # Assign the new lowercase names to the dataframe
+  colnames(df) <- new_names
+  usuarios <- rbind(usuarios, df)
+  
+  
+}
+
+# Save the column names to a CSV file
+output_file <- "datasets/usuarios/post/nombres_columnas.csv"
+write.csv(column_names_list, file = output_file)
+
+
+```
+
+Se observa que las columnas tienen los mismos nombres salvo por mayúsculas. Se procede a concatenar con esta salvedad
+
+```{r}
+# View the combined dataframe
+head(usuarios)
+
+
+```
+```{r}
+filter(usuarios, year == "2022")
+
+
+```
+
+```{r}
+# Exportar dataframe de usuarios
+
+write.csv(usuarios, file = "datasets/usuarios/post/usuarios_completo.csv", row.names = FALSE)
+
+```
+

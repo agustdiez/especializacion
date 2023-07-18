@@ -1,0 +1,27 @@
+---
+title: "ECOBICI: EDA"
+author: "Agustín Diez"
+date: "---"
+output: 
+  html_notebook:
+    theme: lumen
+    toc: yes
+    toc_float: yes
+    df_print: paged
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+
+```{r, echo=FALSE}
+options(scipen=999)
+
+```
+
+
+
+## Librerías utilizadas
+```{r,message=FALSE}
+
+```

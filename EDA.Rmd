@@ -1,0 +1,340 @@
+---
+title: "ECOBICI: EDA"
+author: "Agustín Diez"
+date: "---"
+output: 
+  html_notebook:
+    theme: lumen
+    toc: yes
+    toc_float: yes
+    df_print: paged
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+
+```{r, echo=FALSE}
+options(scipen=999)
+
+```
+
+
+## Librerías utilizadas
+```{r,message=FALSE}
+library(rmdformats)
+library(tidyverse)
+library(tidymodels)
+library(lubridate)
+library(GGally)
+library(dplyr)
+library(esquisse)
+library(ggplot2)
+library(ggpubr)
+library(robustbase)
+library(stringr)
+
+library(tidyr)
+```
+
+
+## Seteo de directorio
+
+```{r}
+setwd("D:\\OneDrive\\Personal\\Maestria Data Mining\\Cuatrimestre_3\\Taller de Tesis I\\Ecobici")
+```
+
+
+## Lectura del dataset
+
+
+Se carga el dataset a continuación y una descripción de los tipos de variables que tiene el mismo
+```{r, message=FALSE}
+ecobici_2022 = read_csv(file='.//datasets//recorridos//trips_2022.csv')
+glimpse(ecobici_2022)
+```
+
+## EDA y descripción de variables
+
+```{r}
+glimpse(ecobici_2022)
+df=ecobici_2022
+```
+### Id_recorrido
+
+Se distingue un número, y luego el BAEcobici en todos los registros. Chequear si son únicos
+
+```{r}
+unique(df['Id_recorrido'])
+
+#Hago extracción del BAEcobici para chequear que todos terminan igual
+
+df <- df %>% mutate(Id_recorrido = str_sub(Id_recorrido,0,8),
+                    id_usuario = gsub("BAEcobici","",id_usuario))
+
+```
+### id_usuario
+
+```{r}
+# Cuento la cantidad de usuarios que usaron el sistema este año
+
+num_usuarios <- nrow(unique(df['id_usuario']))
+paste0('La cantidad de usuarios que usaron el sistema es ',num_usuarios)
+
+cant_veces <- table(df$id_usuario)
+
+cant_veces_sort <- sort(cant_veces,decreasing=TRUE)
+
+barplot(cant_veces_sort,
+        main = 'Viajes por usuario',
+        xlab = 'Franja de usuarios',
+        ylab = 'Cant. de viajes',
+        breaks = 15
+        )
+
+
+
+```
+
+```{r}
+filter(df,id_usuario == "822802")
+```
+
+
+### Creación de dataframe de usuarios
+
+```{r}
+df_usuarios <- data.frame(id_usuario = names(cant_veces_sort),
+                          viajes_anuales = as.numeric(cant_veces_sort))
+```
+
+
+```{r}
+boxplot(cant_veces_sort)
+```
+
+
+
+### Variables asociadas a fechas
+
+#### fecha_origen_recorrido; fecha_destino_recorrido
+
+Chequeo de que tipos son ambas columnas. Creo columnas con el mes, el día, el día de la semana, la hora y los minutos. Aplico ambos procesos a 
+
+```{r}
+
+df <- df %>% mutate(dia_origen_fecha = format(fecha_origen_recorrido, "%Y-%m-%d"),
+              dia_origen=day(fecha_origen_recorrido),
+              mes_origen=month(fecha_origen_recorrido),
+              dia_semana_origen = wday(fecha_origen_recorrido), #1 es domingo, #2 a #6 es dia de semana, #7 es sabado
+              hora_origen = hour(fecha_origen_recorrido),
+              minuto_origen = minute(fecha_origen_recorrido),
+              horario_origen = format(as.POSIXct(fecha_origen_recorrido), format = "%H:%M"),
+              .after = fecha_origen_recorrido)
+
+
+df <- df %>% mutate(dia_destino_fecha = format(fecha_destino_recorrido, "%Y-%m-%d"),
+              dia_destino=day(fecha_destino_recorrido),
+              mes_destino=month(fecha_destino_recorrido),
+              dia_semana_destino = wday(fecha_destino_recorrido), #1 es domingo, #2 a #6 es dia de semana, #7 es sabado
+              hora_destino = hour(fecha_destino_recorrido),
+              minuto_destino = minute(fecha_destino_recorrido),
+              horario_destino = format(as.POSIXct(fecha_destino_recorrido), format = "%H:%M"),
+              .after = fecha_destino_recorrido)
+
+
+
+
+```
+
+
+### Variable asociada a estaciones
+
+```{r}
+unique(df$nombre_estacion_destino)
+
+```
+
+En función de esto, busco crear nuevas variables: nombre de estación e ID. Hay algunas estaciones sin ID
+
+```{r}
+unique(df$nombre_estacion_destino)
+```
+
+
+```{r}
+df <- df %>% mutate(id_estacion_origen = str_extract(df$nombre_estacion_origen,"[0-9]{3}"),
+              nombre_estacion_origen = str_remove(df$nombre_estacion_origen,"[0-9]{3}"),
+              #Saco el guion y el primer espacio y paso a Capital first
+              nombre_estacion_origen = gsub('- ','',nombre_estacion_origen),
+              nombre_estacion_origen = gsub('-','',nombre_estacion_origen),
+              #Corrijo y pongo full caps en las primeras palabras
+              nombre_estacion_origen = str_to_title(nombre_estacion_origen),
+              .after = nombre_estacion_origen)
+
+
+df <- df %>% mutate(id_estacion_destino = str_extract(df$nombre_estacion_destino,"[0-9]{3}"),
+              nombre_estacion_destino = str_remove(df$nombre_estacion_destino,"[0-9]{3}"),
+              #Saco el guion y el primer espacio y paso a Capital first
+              nombre_estacion_destino = gsub('- ','',nombre_estacion_destino),
+              nombre_estacion_destino = gsub('-','',nombre_estacion_destino),
+              #Corrijo y pongo full caps en las primeras palabras
+              nombre_estacion_destino = str_to_title(nombre_estacion_destino),
+              .after = nombre_estacion_destino)
+           
+```
+
+Si los datos están bien debemos ver la misma cantidad de valores unicos en las tuplas de ubicacion
+
+```{r}
+# 
+
+puntos_distintos_long_origen <- length(unique(df$long_estacion_origen))
+puntos_distintos_lat_origen <- length(unique(df$lat_estacion_origen))
+
+puntos_distintos_long_destino <- length(unique(df$long_estacion_destino))
+puntos_distintos_lat_destino <- length(unique(df$lat_estacion_destino))
+```
+
+
+```{r}
+paste('Hay (',puntos_distintos_lat_origen,puntos_distintos_long_origen,' y se visualizan',length(unique(df$nombre_estacion_origen)))
+```
+Filtro por estacion
+
+
+```{r}
+
+#Chequeo si hay duplicados
+df %>% 
+  group_by(nombre_estacion_origen) %>% 
+  summarise(n_distinct(lat_estacion_origen), n_distinct(long_estacion_origen))
+```
+
+Queda validado que todas las estaciones tienen una única estación. Extraigo un .csv con la data de las estaciones de ecobici
+
+
+
+```{r}
+length(unique(df_estaciones$nombre_estacion_origen))
+length(unique(df_estaciones$nombre_estacion_destino))
+
+
+```
+
+
+```{r}
+# Find the values in 'column1' that are not present in 'column2'
+missing_values <- df_estaciones$nombre_estacion_destino[!(df_estaciones$nombre_estacion_destino %in% df_estaciones$nombre_estacion_origen)]
+
+# View the missing values
+missing_values
+```
+
+```{r}
+#Chequeo las filas con esos missing values
+
+filter(df,nombre_estacion_destino == " Pb")
+filter(df,nombre_estacion_destino == " Plaza Boedo")
+filter(df,nombre_estacion_destino == " Segui")
+
+# Son 3 registros que quedaron mal guardados. Se borran.
+
+# Delete rows with specific values in 'column'
+df <- df[!(df$nombre_estacion_destino %in% missing_values), ]
+
+```
+
+```{r}
+length(unique(df$nombre_estacion_origen))
+length(unique(df$nombre_estacion_destino))
+
+
+```
+
+```{r}
+# Creo un dataframe de estaciones. Extraigo el nombre, el ID, la latitud, la longitud
+
+# Extract unique destinations with their IDs, latitude, and longitude
+df_estaciones <- unique(df[c("nombre_estacion_origen","id_estacion_origen" ,"direccion_estacion_origen","long_estacion_origen","lat_estacion_origen")])
+```
+
+
+```{r}
+#Veo si hay algun duplicado. Macacha guemes está dos veces
+
+machaca_duplicado <- filter(df_estaciones,nombre_estacion_origen == ' Macacha Guemes')
+
+# Está mal la dirección de uno. La correcta es Macacha Guemes
+# Delete rows with specific values in 'column'
+df_estaciones <- df_estaciones[!(df_estaciones$direccion_estacion_origen == "Machaca Guemes 350"), ]
+
+```
+
+```{r}
+length(unique(df_estaciones$nombre_estacion_origen))
+```
+
+
+Guardo como un .csv para visualizarlo en GIS
+
+```{r}
+write.csv(df_estaciones, ".//Avances//lista_estaciones.csv", row.names = FALSE)
+```
+
+### duracion_recorrido
+
+Realizo histograma para estudiar la unidad de tiempo. Se encuentra en segundos la columna. Se identifican viajes que registran tiempos muy elevados. Se estudia todos aquellos que exceden el tiempo de uso permitido
+
+```{r}
+hist(df$duracion_recorrido,breaks = 10)
+```
+Se aprecia que hay valores muy altos de duración de viajes. Los días de semana se pueden hacer viajes de hasta 60 min de manera gratuita y de 30 min los fines de semana
+
+```{r}
+df %>% arrange(desc(duracion_recorrido))
+```
+
+Se observa que hay bicicletas que son usadas por más de un día. En función del día de la semana cuando se saca la bici, se clasifica el viaje como GRATUITO, PAGO, ANORMAL (si excede el día de uso)
+
+```{r}
+df <- df %>% mutate(tipo_viaje = case_when(
+    ((duracion_recorrido <= 3600 & dia_semana_origen %in% c(2,3,4,5,6)) | (duracion_recorrido <= 1800 & dia_semana_origen %in% c(1,7)))  ~ "GRATUITO" ,
+    ((duracion_recorrido > 3600 & dia_semana_origen %in% c(2,3,4,5,6)) | (duracion_recorrido > 1800 & dia_semana_origen %in% c(1,7)))  ~ "PAGO"  ,
+    (dia_semana_origen != dia_semana_destino) | (duracion_recorrido > 86400) ~ "ANORMAL"
+  ))
+```
+
+Cuento cuantos viajes de cada tipo hay
+
+
+```{r}
+freq <- table(df$tipo_viaje)
+```
+
+```{r}
+freq
+```
+
+## Extracción de dataframes finales
+
+```{r}
+#A fin de extraer un dataframe que sirva para identificar cada viaje, se extraen las siguientes variables:
+
+variables_interes <- c("Id_recorrido","duracion_recorrido",
+               "dia_origen_fecha","dia_semana_origen","horario_origen","id_estacion_origen","nombre_estacion_origen",
+               "dia_destino_fecha","dia_semana_destino","horario_destino","id_estacion_destino","nombre_estacion_destino",
+               "id_usuario","modelo_bicicleta","Género","tipo_viaje")
+
+df_viajes <- df[variables_interes]
+```
+
+
+Guardo como un .csv para visualizarlo en GIS
+
+```{r}
+write.csv(df_viajes, ".//Avances//viajes_procesado.csv", row.names = FALSE)
+```
+
+
+
